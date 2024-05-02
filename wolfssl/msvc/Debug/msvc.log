@@ -1,0 +1,21 @@
+﻿  Open Watcom Make Version 1.9
+  Portions Copyright (c) 1988-2002 Sybase, Inc. All Rights Reserved.
+  Source code is available under the Sybase Open Watcom Public License.
+  See http://www.openwatcom.org/ for details.
+  	del *.obj
+  	del test.exe
+  Could Not Find C:\code\MicroWeb\lib\wolfssl\test.exe
+  Open Watcom Make Version 1.9
+  Portions Copyright (c) 1988-2002 Sybase, Inc. All Rights Reserved.
+  Source code is available under the Sybase Open Watcom Public License.
+  See http://www.openwatcom.org/ for details.
+  	wpp -fo=test.obj -zq -0 -ot -bt=DOS -w2 -ml -dHAVE_CONFIG_H -dWOLFSSL_USER_SETTINGS -dBUILDING_WOLFSSL -i. -wcd=14 -i.. test.c
+  	wpp -fo=crl.obj -zq -0 -ot -bt=DOS -w2 -ml -dHAVE_CONFIG_H -dWOLFSSL_USER_SETTINGS -dBUILDING_WOLFSSL -i. -wcd=14 src\crl.c
+  	wpp -fo=dtls.obj -zq -0 -ot -bt=DOS -w2 -ml -dHAVE_CONFIG_H -dWOLFSSL_USER_SETTINGS -dBUILDING_WOLFSSL -i. -wcd=14 src\dtls.c
+  	wpp -fo=dtls13.obj -zq -0 -ot -bt=DOS -w2 -ml -dHAVE_CONFIG_H -dWOLFSSL_USER_SETTINGS -dBUILDING_WOLFSSL -i. -wcd=14 src\dtls13.c
+  	wpp -fo=internal.obj -zq -0 -ot -bt=DOS -w2 -ml -dHAVE_CONFIG_H -dWOLFSSL_USER_SETTINGS -dBUILDING_WOLFSSL -i. -wcd=14 src\internal.c
+  	wpp -fo=internal2.obj -zq -0 -ot -bt=DOS -w2 -ml -dHAVE_CONFIG_H -dWOLFSSL_USER_SETTINGS -dBUILDING_WOLFSSL -i. -wcd=14 src\internal2.c
+  src\internal2.c(3067): Error! E029: col(27) symbol 'EccSharedSecret' has not been declared
+  Error(E42): Last command making (internal2.obj) returned a bad status
+  Error(E02): Make execution terminated
+C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\MSBuild\Microsoft\VC\v160\Microsoft.MakeFile.Targets(46,5): error MSB3073: The command "build.bat" exited with code 2.

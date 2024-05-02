@@ -1,0 +1,4 @@
+*.obj
+wolfssl/msvc/.vs/
+*.err
+*.map
