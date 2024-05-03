@@ -80,6 +80,7 @@
 // Options set by user supplied args
 
 bool     Verbose = false;
+bool	 DebugWolfSSL = false;
 bool     QuietMode = false;
 bool     HeadersOnly = false;
 bool     ShowHeaders = false;
@@ -245,67 +246,6 @@ inline void verboseMessage( char *fmt, ... ) {
   }
 }
 
-int8_t connectSocket( void );
-
-// Start of WolfSSL helper functions
-int my_IORecv(WOLFSSL* ssl, char* buff, int sz, void* ctx)
-{
-    TcpSocket* sockctx = (TcpSocket*)(ctx);
-	
-    int recvd;
-
-	//verboseMessage("my_IORecv called\n");
-
-	PACKET_PROCESS_MULT( 5 );
-	Tcp::drivePackets( );
-	Arp::driveArp( );
-
-	/* Receive message from socket */
-	if ((recvd = sockctx->recv((unsigned char*) buff, sz)) < 0) 
-	{
-		if(sockctx->isRemoteClosed( ))
-		{
-			verboseMessage("my_IORecv remote socket was closed\n");
-		}
-		verboseMessage("my_IORecv error: %d socket state: %d\n", recvd, sockctx->state);
-		return WOLFSSL_CBIO_ERR_GENERAL;
-	}
-
-    return recvd;
-}
-
-int my_IOSend(WOLFSSL* ssl, char* buff, int sz, void* ctx)
-{
-    TcpSocket* sockctx = (TcpSocket*)(ctx);
-	
-    int sent;
-	
-	//verboseMessage("my_IOSend called\n");
-
-	PACKET_PROCESS_MULT( 5 );
-	Tcp::drivePackets( );
-	Arp::driveArp( );
-
-	if ((sent = sockctx->send((unsigned char*)buff, sz)) < 0) 
-	{
-		if(sockctx->isRemoteClosed( ))
-		{
-			verboseMessage("my_IOSend remote socket was closed\n");
-		}
-		verboseMessage("my_IOSend error %d socket state: %d\n", sent, sockctx->state);
-		return WOLFSSL_CBIO_ERR_GENERAL;
-	} 
-
-    return sent;
-}
-
-void wolfLogger(const int logLevel, const char *const logMessage) 
-{
-	printf("WolfSSL: [%d] %s\n", logLevel, logMessage);
-}
-// End WolfSSL functions
-
-
 // Ctrl-Break and Ctrl-C handler.  Check the flag once in a while to see if
 // the user wants out.
 
@@ -336,7 +276,71 @@ uint8_t userWantsOut( void ) {
   return 0;
 }
 
+// Start of WolfSSL helper functions
+int my_IORecv(WOLFSSL* ssl, char* buff, int sz, void* ctx)
+{
+    TcpSocket* sockctx = (TcpSocket*)(ctx);
+	
+    int recvd;
 
+	//verboseMessage("my_IORecv called\n");
+    if ( userWantsOut( ) ) {
+		return WOLFSSL_CBIO_ERR_GENERAL;
+    }
+
+	PACKET_PROCESS_MULT( 5 );
+	Tcp::drivePackets( );
+	Arp::driveArp( );
+
+	/* Receive message from socket */
+	if ((recvd = sockctx->recv((unsigned char*) buff, sz)) < 0) 
+	{
+		if(sockctx->isRemoteClosed( ))
+		{
+			errorMessage("my_IORecv remote socket was closed\n");
+			return WOLFSSL_CBIO_ERR_CONN_CLOSE;
+		}
+		errorMessage("my_IORecv error: %d socket state: %d\n", recvd, sockctx->state);
+		return WOLFSSL_CBIO_ERR_GENERAL;
+	}
+
+    return recvd;
+}
+
+int my_IOSend(WOLFSSL* ssl, char* buff, int sz, void* ctx)
+{
+    TcpSocket* sockctx = (TcpSocket*)(ctx);
+	
+    int sent;
+	
+    if ( userWantsOut( ) ) {
+		return WOLFSSL_CBIO_ERR_GENERAL;
+    }
+	//verboseMessage("my_IOSend called\n");
+
+	PACKET_PROCESS_MULT( 5 );
+	Tcp::drivePackets( );
+	Arp::driveArp( );
+
+	if ((sent = sockctx->send((unsigned char*)buff, sz)) < 0) 
+	{
+		if(sockctx->isRemoteClosed( ))
+		{
+			errorMessage("my_IOSend remote socket was closed\n");
+			return WOLFSSL_CBIO_ERR_CONN_CLOSE;
+		}
+		errorMessage("my_IOSend error %d socket state: %d\n", sent, sockctx->state);
+		return WOLFSSL_CBIO_ERR_GENERAL;
+	} 
+
+    return sent;
+}
+
+void wolfLogger(const int logLevel, const char *const logMessage) 
+{
+	fprintf(stderr, "WolfSSL: [%d] %s\n", logLevel, logMessage);
+}
+// End WolfSSL functions
 
 
 // Ends the TCP/IP stack and ends the program in a sane way.
@@ -832,13 +836,15 @@ int8_t connectSocket( void ) {
 	verboseMessage("Starting TLS connection..\n");
     /* Connect to wolfSSL on the server side */
     if ((ret = wolfSSL_connect(wolfssl_ssl)) != SSL_SUCCESS) {
-        int iErrCode = wolfSSL_get_error(wolfssl_ssl, ret);
-		char errorString[80];
-		wolfSSL_ERR_error_string(iErrCode, errorString);
-        printf("ERROR: failed to connect wolfSSL: Error Code %d %s\n", iErrCode, errorString);
+		if ( !userWantsOut( ) ) {
+			int iErrCode = wolfSSL_get_error(wolfssl_ssl, ret);
+			char errorString[80];
+			wolfSSL_ERR_error_string(iErrCode, errorString);
+			errorMessage("Failed to establish TLS connection. Error Code %d %s\n", iErrCode, errorString);
+		}
 		return -1;
     }
-	verboseMessage("Connection established\n");
+	verboseMessage("TLS connection established\n");
   }
 
   return rc;
@@ -1394,6 +1400,7 @@ char *HelpText = {
   "Options:\n"
   "  -h                       Shows this help\n"
   "  -v                       Print verbose status messages\n"
+  "  -d                       Print WolfSSL debug messages\n"
   "  -quiet                   Quiet mode (does not apply to usage errors)\n"
   "  -headers                 Fetch only the HTTP headers\n"
   "  -showheaders             Fetch content, but show headers too\n"
@@ -1435,8 +1442,10 @@ static void parseArgs( int argc, char *argv[] ) {
     }
     else if ( stricmp( argv[i], "-v" ) == 0 ) {
       Verbose = true;
-	  Trace_beginTracing();
     }
+    else if ( stricmp( argv[i], "-d" ) == 0 ) {
+		DebugWolfSSL = true;
+	}
     else if ( stricmp( argv[i], "-headers" ) == 0 ) {
       HeadersOnly = true;
     }
@@ -1484,8 +1493,8 @@ static void parseArgs( int argc, char *argv[] ) {
 
   }
 
-  if ( QuietMode && Verbose ) {
-    usageError( "%s", "Do not specify both -quiet and -v\n" );
+  if ( QuietMode && (Verbose || DebugWolfSSL) ) {
+    usageError( "%s", "Do not specify both -quiet and -v / -d\n" );
   }
     
 
@@ -1725,9 +1734,12 @@ int main( int argc, char *argv[] ) {
         errorMessage("ERROR: failed in call to wolfSSL_UseSNI\n");
 		exit(1);
     }
-	
-	wolfSSL_SetLoggingCb(wolfLogger);
-    wolfSSL_Debugging_ON();
+
+	if(DebugWolfSSL)
+	{
+		wolfSSL_SetLoggingCb(wolfLogger);
+		wolfSSL_Debugging_ON();
+	}
   }
 
   if ( Utils::initStack( 1, TCP_SOCKET_RING_SIZE, ctrlBreakHandler, ctrlBreakHandler ) ) {
